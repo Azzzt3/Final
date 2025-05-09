@@ -1,139 +1,160 @@
-# Final
-
+# ticketing_gui.py
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import ttk, messagebox
 import pickle
 from datetime import date
-from typing import List
 
-# === Original Classes ===
+# ==== Data Classes ====
 
 class User:
-    def __init__(self, name: str, email: str, password: str):
+    def __init__(self, name, email, password):
         self.name = name
         self.email = email
         self.password = password
-
-    def create_account(self):
-        print(f"Account created for {self.name}")
-
-    def view_purchase_history(self):
-        print("Showing purchase history...")
-
-    def manage_visit(self):
-        print("Managing visit...")
-
-class Admin(User):
-    def view_sales_data(self):
-        print("Viewing real-time sales data...")
+        self.orders = []
 
 class Ticket:
-    def __init__(self, ticket_id: str, race_date: date, price: float, ticket_type: str):
+    def __init__(self, ticket_id, race_date, price, ticket_type):
         self.ticket_id = ticket_id
         self.race_date = race_date
         self.price = price
         self.ticket_type = ticket_type
 
 class SingleRace(Ticket):
-    def __init__(self, ticket_id: str, race_date: date, price: float, race_name: str):
+    def __init__(self, ticket_id, race_date, price, race_name):
         super().__init__(ticket_id, race_date, price, "SingleRace")
         self.race_name = race_name
 
-    def get_race_details(self):
-        print(f"Race: {self.race_name} on {self.race_date}")
-
 class WeekendPackage(Ticket):
-    def __init__(self, ticket_id: str, race_date: date, price: float, races_included: List[str]):
+    def __init__(self, ticket_id, race_date, price, races):
         super().__init__(ticket_id, race_date, price, "WeekendPackage")
-        self.races_included = races_included
-
-    def get_schedule(self):
-        print(f"Weekend schedule includes: {', '.join(self.races_included)}")
-
-class SeasonMembership(Ticket):
-    def __init__(self, ticket_id: str, race_date: date, price: float, membership_id: str, valid_until: date):
-        super().__init__(ticket_id, race_date, price, "SeasonMembership")
-        self.membership_id = membership_id
-        self.valid_until = valid_until
-
-    def renew_membership(self):
-        print(f"Membership {self.membership_id} renewed until {self.valid_until}")
+        self.races = races
 
 class GroupDiscount(Ticket):
-    def __init__(self, ticket_id: str, race_date: date, price: float, group_size: int, discount_rate: float):
+    def __init__(self, ticket_id, race_date, price, group_size, discount):
         super().__init__(ticket_id, race_date, price, "GroupDiscount")
         self.group_size = group_size
-        self.discount_rate = discount_rate
+        self.discount = discount
 
-    def calculate_group_price(self):
-        total = self.price * self.group_size * (1 - self.discount_rate)
-        print(f"Total group price: ${total:.2f}")
-        return total
+class Admin:
+    def __init__(self):
+        self.sales_data = {}
 
-class TicketOrder:
-    def __init__(self, order_date: date, tickets: List[Ticket]):
-        self.order_date = order_date
-        self.tickets = tickets
-        self.total_price = sum(ticket.price for ticket in tickets)
+    def record_sale(self, date_str):
+        if date_str not in self.sales_data:
+            self.sales_data[date_str] = 0
+        self.sales_data[date_str] += 1
 
-    def calculate_discounts(self):
-        print("Discounts calculated (placeholder)")
-
-class CapacityManager:
-    def track_sales(self):
-        print("Tracking sales...")
-
-    def view_capacity(self):
-        print("Viewing venue capacity...")
-
-# === GUI with Tkinter and Pickle ===
+# ==== Data Storage ====
 
 users = []
+admin = Admin()
 
-def save_users():
-    with open("users.pkl", "wb") as f:
-        pickle.dump(users, f)
-    messagebox.showinfo("Success", "Users saved to users.pkl")
+# ==== GUI Setup ====
+
+class TicketingApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Ticketing System")
+        self.current_user = None
+        self.build_login_interface()
+
+    def build_login_interface(self):
+        self.clear_root()
+
+        ttk.Label(self.root, text="Email:").grid(row=0, column=0)
+        self.email_entry = ttk.Entry(self.root)
+        self.email_entry.grid(row=0, column=1)
+
+        ttk.Label(self.root, text="Password:").grid(row=1, column=0)
+        self.pass_entry = ttk.Entry(self.root, show="*")
+        self.pass_entry.grid(row=1, column=1)
+
+        ttk.Button(self.root, text="Login", command=self.login).grid(row=2, column=0)
+        ttk.Button(self.root, text="Register", command=self.register).grid(row=2, column=1)
+
+    def login(self):
+        email = self.email_entry.get()
+        password = self.pass_entry.get()
+        for user in users:
+            if user.email == email and user.password == password:
+                self.current_user = user
+                self.build_user_dashboard()
+                return
+        if email == "admin" and password == "admin":
+            self.build_admin_dashboard()
+            return
+        messagebox.showerror("Login Failed", "Invalid credentials")
+
+    def register(self):
+        email = self.email_entry.get()
+        password = self.pass_entry.get()
+        name = email.split('@')[0]
+        user = User(name, email, password)
+        users.append(user)
+        pickle.dump(users, open("users.pkl", "wb"))
+        messagebox.showinfo("Success", "User registered")
+
+    def build_user_dashboard(self):
+        self.clear_root()
+        ttk.Label(self.root, text=f"Welcome {self.current_user.name}!").pack()
+        ttk.Button(self.root, text="Buy Ticket", command=self.ticket_interface).pack(pady=5)
+        ttk.Button(self.root, text="My Orders", command=self.display_orders).pack(pady=5)
+        ttk.Button(self.root, text="Logout", command=self.build_login_interface).pack(pady=5)
+
+    def ticket_interface(self):
+        self.clear_root()
+        ttk.Label(self.root, text="Select Ticket Type").pack()
+        ttk.Button(self.root, text="Single Race", command=lambda: self.buy_ticket("single")).pack()
+        ttk.Button(self.root, text="Weekend Package", command=lambda: self.buy_ticket("weekend")).pack()
+        ttk.Button(self.root, text="Group Discount", command=lambda: self.buy_ticket("group")).pack()
+        ttk.Button(self.root, text="Back", command=self.build_user_dashboard).pack(pady=5)
+
+    def buy_ticket(self, type_):
+        ticket = None
+        today = date.today().isoformat()
+        if type_ == "single":
+            ticket = SingleRace("SR001", today, 100.0, "Desert GP")
+        elif type_ == "weekend":
+            ticket = WeekendPackage("WP001", today, 250.0, ["Day 1", "Day 2"])
+        elif type_ == "group":
+            ticket = GroupDiscount("GD001", today, 400.0, 5, 0.2)
+        
+        self.current_user.orders.append(ticket)
+        admin.record_sale(today)
+        messagebox.showinfo("Purchase Successful", f"{type_.capitalize()} Ticket purchased.")
+
+    def display_orders(self):
+        self.clear_root()
+        ttk.Label(self.root, text="Your Orders").pack()
+        for ticket in self.current_user.orders:
+            ttk.Label(self.root, text=f"{ticket.ticket_type} on {ticket.race_date}, Price: {ticket.price}").pack()
+        ttk.Button(self.root, text="Back", command=self.build_user_dashboard).pack(pady=5)
+
+    def build_admin_dashboard(self):
+        self.clear_root()
+        ttk.Label(self.root, text="Admin Dashboard").pack()
+        ttk.Label(self.root, text="Ticket Sales Per Day:").pack()
+        for day, count in admin.sales_data.items():
+            ttk.Label(self.root, text=f"{day}: {count} tickets").pack()
+        ttk.Button(self.root, text="Logout", command=self.build_login_interface).pack(pady=10)
+
+    def clear_root(self):
+        for widget in self.root.winfo_children():
+            widget.destroy()
+
+# ==== Main Execution ====
 
 def load_users():
     global users
     try:
-        with open("users.pkl", "rb") as f:
-            users = pickle.load(f)
-        messagebox.showinfo("Loaded", f"{len(users)} user(s) loaded from file.")
-    except FileNotFoundError:
-        messagebox.showerror("Error", "No saved users found.")
+        users = pickle.load(open("users.pkl", "rb"))
+    except:
+        users = []
 
-def create_user():
-    name = name_entry.get()
-    email = email_entry.get()
-    password = password_entry.get()
+if __name__ == '__main__':
+    load_users()
+    root = tk.Tk()
+    app = TicketingApp(root)
+    root.mainloop()
 
-    if name and email and password:
-        user = User(name, email, password)
-        user.create_account()
-        users.append(user)
-        messagebox.showinfo("Account Created", f"User '{name}' added.")
-    else:
-        messagebox.showwarning("Missing Info", "Please fill all fields.")
-
-root = tk.Tk()
-root.title("Ticketing System - User Manager")
-
-tk.Label(root, text="Name").grid(row=0, column=0)
-tk.Label(root, text="Email").grid(row=1, column=0)
-tk.Label(root, text="Password").grid(row=2, column=0)
-
-name_entry = tk.Entry(root)
-email_entry = tk.Entry(root)
-password_entry = tk.Entry(root, show="*")
-
-name_entry.grid(row=0, column=1)
-email_entry.grid(row=1, column=1)
-password_entry.grid(row=2, column=1)
-
-tk.Button(root, text="Create User", command=create_user).grid(row=3, column=0, pady=10)
-tk.Button(root, text="Save Users", command=save_users).grid(row=3, column=1)
-tk.Button(root, text="Load Users", command=load_users).grid(row=4, column=0, columnspan=2)
-
-root.mainloop()
